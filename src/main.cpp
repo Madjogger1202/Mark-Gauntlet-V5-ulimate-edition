@@ -66,131 +66,294 @@ Now about functional:
 
 */
 
+// LET THEREEE BEEE PINOUTTTT :)
 
-#include <Arduino.h>
+// LCD (parallel interface goes to digital 2-9 pins)
+///////////////////////
+#define LCD_CS    A3 // Chip Select goes to Analog 3
+#define LCD_CD    A2 // Command/Data goes to Analog 2
+#define LCD_WR    A1 // LCD Write goes to Analog 1
+#define LCD_RD    A0 // LCD Read goes to Analog 0
+#define LCD_RESET A4 // Can alternately just connect to Arduino's reset pi
+///////////////////////
 
-#include <SPI.h>
+// NRF24L01+
+//////////////////////
+#define NRF_CE 28   //
+#define NRF_CS 31   //
+//////////////////////
 
-#include <Wire.h>
+// LoRa
+////////////////////////
+#define LORA_NSS  22  //
+#define LORA_RST  23  //
+#define LORA_DIO0 10  //
+////////////////////////
 
-#include <SoftwareSerial.h>
+// ESP
+#define ESP_SERIAL Serial2
 
-#include "Adafruit_GFX.h"
-#include <MCUFRIEND_kbv.h>
+// Bluetooth
+#define BLUETOOTH_SERIAL Serial1
 
-#include <Adafruit_Sensor.h>
-#include <Adafruit_LSM303_U.h>
-#include <Adafruit_MPU6050.h>
+// GPS
+#define GPS_SERIAL Serial3
 
-#include "microLED.h"
+// mp3 player sotf. uart
+////////////////////
+#define MP3_TX 30 //
+#define MP3_RX 29 //
+////////////////////
 
-#include <LoRa.h>
+// Voice recog. module
+////////////////////
+#define VR_TX 48  //
+#define VR_RX 24  //
+////////////////////
 
-#include "nRF24L01.h"
-#include "RF24.h"
-#include "printf.h"
+// LED (28 leds)
+////////////////////////
+#define LED_PIN 26    //
+#define NUM_LEDS 28   // number of leds in strip
+#define COLOR_DEBTH 3 // 3 - max
+////////////////////////
+// O2
+#define O2_SENSOR A7
 
-#include <iarduino_GPS_NMEA.h>
+// EMG 
+////////////////////////
+#define EMG_AOUT A5   //
+#define EMG_CS   A6   //
+////////////////////////
 
-#include <iarduino_RTC.h>
+// thermometr
+#define DS18B20_PIN 13
 
-#include <Adafruit_BME280.h>
+// co2 sensor pwm pin
+#define CO2_PWM 11
 
-#include "Adafruit_APDS9960.h"
+// Potentiomer pin
+#define POT_PIN A14
 
-#include <SHT3x.h> 
+// Joystick
+////////////////////
+#define JOY_X A15 //
+#define JOY_Y A13 //
+////////////////////
+// buttons
+const int buttons_pins[4]={A11, A9, A10, 27};
 
-#include "Adafruit_SGP30.h"
+// switchers 
+//////////////////////////////////////////////////////////
+const int sw1_pins[8]={32, 33, 34, 35, 36, 37, 38, 39}; //
+const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
+//////////////////////////////////////////////////////////
 
-#include "VoiceRecognitionV3.h"
+// baudrates (most of them depends on modules)
+//////////////////////////////////////////
+#define GPS_BAUDRATE           9600     //
+#define ESP_BAUDRATE           115200   //
+#define BLUETOOTH_BAUDRATE     9600     //
+#define MP3_BAUDRATE           9600     //
+#define VR_BAUDRATE            9600     //
+#define COMMUNICATION_BAUDRATE 115200   //
+//////////////////////////////////////////
 
-#include <DFPlayer_Mini_Mp3.h>
+// Some colors
+////////////////////////////////
+#define BLACK      0x0000     //
+#define BLUE       0x001F     //
+#define RED        0xF800     //
+#define GREEN      0x07E0     //
+#define CYAN       0x07FF     //  
+#define MAGENTA    0xF81F     //
+#define YELLOW     0xFFE0     //
+#define DARKYELLOW 0x5AE3     //
+#define WHITE      0xFFFF     //
+#define BLUEWHITE  0xEFFF     //
+////////////////////////////////
 
-MCUFRIEND_kbv tft;
+// NRF_SETTINGS
+//////////////////////////////////////////
+#define NRF_CHANNEL 103                 // you can choose in range 0-127
+#define NRF_DATA_RATE RF24_250KBPS      // RF24_250KBPS, RF24_1MBPS, RF24_2MBPS
+#define NRF_PA_LEVEL RF24_PA_MAX        // RF24_PA_MIN=-18dBm, RF24_PA_LOW=-12dBm, RF24_PA_HIGH=-6dBm, RF24_PA_MAX=0dBm
+#define NRF_PIPE  0x1234567899LL        // 
+#define NRF_AUTO_ASK false              //
+#define NRF_ENABLE_READING_PIPE false   //
+#define NRF_READING_PIPE 0x9987654321LL //
+//////////////////////////////////////////
 
-Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);
-Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
-Adafruit_MPU6050 mpu;
+// LORA_SETTINGS
+//////////////////////////////////
+#define LORA_FR long(433E6)     // 433-435 (best)
+#define LORA_CRC true           // 
+#define LORA_CODING_RATE 8      // 5-11 (mb)
+#define LORA_SIG_BW 250E3       // 250E3 - max, look at your lib .h file for more
+#define LORA_SP_FACTOR 8        // 8 - best for RA-01 module (at least for mine)
+//////////////////////////////////
 
-#define NUM_LEDS 8  // кол-во диодов
-#define LED_PIN 8   // пин подключения
+#include <Arduino.h>              // default lib
 
-#define REPLACE_FASTLED // пункт 0
-#define COLOR_DEBTH 3   // пункт 1
-LEDdata leds[NUM_LEDS];
+////////////////////////////////////
+#include <SPI.h>                  // interfaces
+#include <Wire.h>                 //
+#include <SoftwareSerial.h>       //
+////////////////////////////////////
 
-microLED strip(leds, NUM_LEDS, LED_PIN);
+////////////////////////////////////
+#include "Adafruit_GFX.h"         // for tft lcd
+#include <MCUFRIEND_kbv.h>        //
+////////////////////////////////////
 
-RF24 radio(46, 53);
+////////////////////////////////////
+#include <Adafruit_Sensor.h>      //
+#include <Adafruit_LSM303_U.h>    // acsels + mag. sensor
+#include <Adafruit_MPU6050.h>     //
+////////////////////////////////////
 
-iarduino_GPS_NMEA gps; 
+#include "microLED.h"             // LED strip lib
 
-iarduino_RTC watch(RTC_DS1307); 
+#include <LoRa.h>                 // Simple LoRa lib
 
-Adafruit_BME280 bme;
+//////////////////////////
+#include "nRF24L01.h"   // NRF lib files
+#include "RF24.h"       //
+#include "printf.h"     //
+//////////////////////////
 
-Adafruit_APDS9960 apds;
+#include <iarduino_GPS_NMEA.h>    // as you can see - gps lib
 
-SHT3x SHT; 
+#include <iarduino_RTC.h>         // for the clock module
 
-Adafruit_SGP30 sgp;
+#include <Adafruit_BME280.h>      // pressure (mostly) sensor 
 
-VR myVR(2,3);
+#include "Adafruit_APDS9960.h"    // gesture sensor
+
+#include <SHT3x.h>                // humid sensor
+
+#include "Adafruit_SGP30.h"       // tVOC sensor
+
+#include "VoiceRecognitionV3.h"   // VR module
+
+#include <DFPlayer_Mini_Mp3.h>    // mp3
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+MCUFRIEND_kbv tft;                                                                                    //
+                                                                                                      //
+////////////////////////////////////////////////////////////////////////////////                      //
+Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);         //                      //
+Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);   //                      //
+Adafruit_MPU6050 mpu;                                                         //                      //
+////////////////////////////////////////////////////////////////////////////////                      //
+                                                                                                      //
+//////////////////////////////////////////////////                                                    //
+LEDdata leds[NUM_LEDS];                         //                                                    //
+microLED strip(leds, NUM_LEDS, LED_PIN);        //                                                    //
+//////////////////////////////////////////////////                                                    //
+                                                                                                      //
+RF24 radio(NRF_CS, NRF_CE);                                                                           //
+                                                                                                      //
+//////////////////////////////////                                                                    //
+iarduino_GPS_NMEA gps;          //                                                                    //  
+iarduino_RTC watch(RTC_DS1307); //                                                                    //
+//////////////////////////////////                                                                    //  
+                                                                                                      //  
+//////////////////////////                                                                            //
+Adafruit_BME280 bme;    //                                                                            //
+Adafruit_APDS9960 apds; //                                                                            //
+Adafruit_SGP30 sgp;     //                                                                            //
+//////////////////////////                                                                            //
+                                                                                                      //
+SHT3x SHT;                                                                                            //
+                                                                                                      //
+VR myVR(VR_RX,VR_TX);                                                                                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-#define LCD_CS A3 // Chip Select goes to Analog 3
-#define LCD_CD A2 // Command/Data goes to Analog 2
-#define LCD_WR A1 // LCD Write goes to Analog 1
-#define LCD_RD A0 // LCD Read goes to Analog 0
-#define LCD_RESET A4 // Can alternately just connect to Arduino's reset pin
+////////////////////////////////
+struct wholeData              //
+{                             //
+  uint8_t mode;               // from swich 1
+  uint8_t channel;            // from swich 2
+  uint16_t button;            // 
+  bool emg_active;            //
+  bool error;                 //
+  uint16_t joy_x;             //
+  uint16_t joy_y;             //
+  uint16_t pot;               //
+  uint16_t flex_sensor_1;     //
+  uint16_t flex_sensor_2;     //
+  float gps_lon;              //
+  float gps_lat;              //
+  float pressure;             //
+  float temp;                 //
+  float tVOC;                 //
+  float humid;                //
+  long time;                  //
+  int16_t acs_x;              //
+  int16_t acs_y;              //
+  int16_t acs_z;              //
+  int8_t mag_x;               //
+  int8_t mag_y;               //
+  int8_t mag_z;               //
+                              //
+} allData;                    //
+////////////////////////////////
 
-#include <SPI.h>          // f.k. for Arduino-1.5.2
-#include "Adafruit_GFX.h"// Hardware-specific library
-#include <MCUFRIEND_kbv.h>
-MCUFRIEND_kbv tft;
+////////////////////////////////
+struct telemetri              //
+{                             //
+  uint8_t id=0;               //
+  long time;                  //
+  uint8_t mode;               //
+  uint8_t channel;            //  
+  uint16_t joy_x;             //
+  uint16_t joy_y;             //
+  uint16_t pot;               //
+  uint16_t flex_sensor_1;     //
+  uint16_t flex_sensor_2;     //
+  int16_t acs_x;              //
+  int16_t acs_y;              //
+  int16_t acs_z;              //  
+  int8_t mag_x;               //
+  int8_t mag_y;               //
+  int8_t mag_z;               //
+} radioData;                  //
+////////////////////////////////
 
-#define  BLACK   0x0000
-#define BLUE    0x001F
-#define RED     0xF800
-#define GREEN   0x07E0
-#define CYAN    0x07FF
-#define MAGENTA 0xF81F
-#define YELLOW  0xFFE0
-#define WHITE   0xFFFF
-#define BLUEWHITE   0xEFFF
+void setup() 
+{
+  ///////////////////////////////////////////
+  pinMode(NRF_CE,    OUTPUT);              //
+  pinMode(NRF_CS,    OUTPUT);              //
+  pinMode(LORA_NSS,  OUTPUT);              //
+  pinMode(LORA_RST,  OUTPUT);              //
+  pinMode(LORA_DIO0, INPUT);               //
+  pinMode(MP3_TX,    INPUT);               //
+  pinMode(MP3_RX,    OUTPUT);              //
+  pinMode(VR_TX,     INPUT);               //
+  pinMode(VR_RX,     OUTPUT);              //
+  pinMode(LED_PIN,   OUTPUT);              //
+  pinMode(O2_SENSOR, INPUT);               //
+  pinMode(EMG_AOUT,  INPUT);               //
+  pinMode(EMG_CS,    OUTPUT);              //
+  pinMode(CO2_PWM,   INPUT);               //
+  pinMode(POT_PIN,   INPUT);               //
+  pinMode(JOY_X,     INPUT);               //
+  pinMode(JOY_Y,     INPUT);               //
+  pinMode(buttons_pins[0], INPUT_PULLUP);  //
+  pinMode(buttons_pins[1], INPUT_PULLUP);  //
+  pinMode(buttons_pins[2], INPUT_PULLUP);  //
+  pinMode(buttons_pins[3], INPUT_PULLUP);  //
+  for(int i = 0; i < 8; i++)               //
+    pinMode(sw1_pins[i], INPUT_PULLUP);    //
+  for(int i = 0; i < 8; i++)               // 
+    pinMode(sw2_pins[i], INPUT_PULLUP);    //
+  ///////////////////////////////////////////
 
+  Serial.begin(COMMUNICATION_BAUDRATE);
 
-void setup() {
-  Serial.begin(9600);
-    uint32_t when = millis();
-    uint16_t ID = tft.readID(); 
-    Serial.print("ID = 0x");
-    Serial.println(ID, HEX);
-    if (ID == 0xD3D3) ID = 0x9481; // write-only shield
-    tft.begin(ID);
-    tft.setRotation(3); 
-    tft.fillScreen(0xAD4E);
-  tft.drawCircle(100,100,20,0xFFE0);
-  tft.fillCircle(100,100,20,0x0000);
-  tft.drawCircle(100,100,18,0xAD4E);
-  tft.fillCircle(100,100,18,0xAD4E);
-  tft.setCursor(0,6);
-  tft.setTextColor(0x0000);
-  tft.setTextSize(2);
-  tft.println(" mode:        channel:");
-  tft.println("");
-  tft.println(" buttons: ");
-  tft.println("");
-  tft.println(" pot: ");
-  tft.println("");
-  tft.println(" gyro: ");
-  tft.println("");
-  tft.println(" mag: ");
-  tft.println("");
-  tft.println(" acs: ");
-  tft.println("");
-  tft.println(" JoyXY: ");
-  //tft.println("mode: ");
   
 }
 void loop() {
