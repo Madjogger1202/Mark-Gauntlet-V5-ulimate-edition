@@ -322,6 +322,45 @@ struct telemetri              //
 } radioData;                  //
 ////////////////////////////////
 
+
+//////////////////////////////
+void sendNrf();             //
+void sendLoRa();            //
+void sendBlt();             //
+uint8_t getMode();          //
+uint8_t getChannel();       //
+uint16_t getButtons();      //
+void getJoyData();          //
+uint16_t getPotData();      //
+uint8_t getGesture();       //
+void readAcs();             //
+void readMag();             //
+void dispInfo();            //
+uint16_t getCo2Data();      //
+float getO2Data();          //
+float getHumid();           //
+uint16_t getTVOCdata();     //
+void dispStrip();           //
+void readEmg();             //
+void getTime();             //
+void getTemp();             //
+void getGPSdata();          //
+void getFlexSensorsData();  //
+                            //
+void mode1();               //
+void mode2();               //
+void mode3();               //
+void mode4();               //
+void mode5();               //
+void mode6();               //
+void mode7();               //
+void mode8();               //
+void mode9();               //
+void mode10();              //
+void mode11();              //
+//////////////////////////////
+
+
 void setup() 
 {
   ///////////////////////////////////////////
@@ -356,7 +395,8 @@ void setup()
 
   
 }
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() 
+{
+  
 
 }
