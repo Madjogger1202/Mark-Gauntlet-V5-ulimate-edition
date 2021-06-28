@@ -131,6 +131,12 @@ Now about functional:
 // thermometr
 #define DS18B20_PIN 13
 
+// flex sesors
+//////////////////////////
+#define FLEX_1_PIN A12  //
+#define FLEX_2_PIN A8   //
+//////////////////////////
+
 // co2 sensor pwm pin
 #define CO2_PWM 11
 
@@ -175,6 +181,14 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 //#define СBLUEWHITE  0xEFFF     //
 ///////////////////////////////////
 
+// ds18b20 oneWire commands
+//////////////////////////////////////////
+#define OW_SKIP_ROM 0xCC                // 
+#define OW_DS18B20_CONVERT_T 0x44       //
+#define OW_DS18B20_READ_SCRATCHPAD 0xBE //
+#define DS18B20_SCRATCHPAD_SIZE 9       //
+//////////////////////////////////////////
+
 // NRF_SETTINGS
 //////////////////////////////////////////
 #define NRF_CHANNEL 103                 // you can choose in range 0-127
@@ -199,6 +213,7 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 #include <SPI.h>                  // interfaces
 #include <Wire.h>                 //
 #include <SoftwareSerial.h>       //
+#include "OneWire.h"              //
 ////////////////////////////////////
 
 ////////////////////////////////////
@@ -265,6 +280,7 @@ SoftwareSerial mp3Serial(MP3_RX, MP3_TX);                                       
 Adafruit_BME280 bme;    //                                                                            //
 Adafruit_APDS9960 apds; //                                                                            //
 Adafruit_SGP30 sgp;     //                                                                            //
+OneWire ds(DS18B20_PIN);//                                                                            //
 //////////////////////////                                                                            //
                                                                                                       //
 SHT3x SHT;                                                                                            //
@@ -327,8 +343,8 @@ struct telemetri              //
 
 //////////////////////////////
 void sendNrf();             //
-void sendLoRa();            //
-void sendBlt();             //
+void sendLoRa(uint8_t msg); //
+void sendBlt(uint8_t msg);             //
 uint8_t getMode();          //
 uint8_t getChannel();       //
 uint16_t getButtons();      //
@@ -348,6 +364,8 @@ void getTime();             //
 void getTemp();             //
 void getGPSdata();          //
 void getFlexSensorsData();  //
+bool ds18b20_r_t(float & t);//
+bool ds18b20_convert_t();   //
                             //
 void mode1();               //
 void mode2();               //
@@ -374,7 +392,10 @@ uint16_t last_acsz;
 uint16_t last_magx;
 uint16_t last_magy;
 uint16_t last_magz;
+
 uint32_t clean_timer;
+
+uint32_t ds18b20_timer; 
 
 void setup() 
 {
@@ -530,14 +551,120 @@ void sendNrf()
   radioData.mag_z=allData.mag_z;
   radio.write(&radioData, sizeof(radioData));
 }            
-void sendLoRa()
+void sendLoRa(uint8_t msg)
 {
-  
-}            
-void sendBlt()
+  LoRa.beginPacket();
+  switch (msg)
+  {
+  case 0:
+    LoRa.print(allData.gps_lat, 7);
+    LoRa.print(" ");
+    LoRa.print(allData.gps_lon, 7);
+    break;
+  case 1:
+    LoRa.print(allData.acs_x);
+    LoRa.print(" ");
+    LoRa.print(allData.acs_y);
+    LoRa.print(" ");
+    LoRa.print(allData.acs_z);
+    break;
+  case 2:
+    LoRa.print(allData.mag_x);
+    LoRa.print(" ");
+    LoRa.print(allData.mag_y);
+    LoRa.print(" ");
+    LoRa.print(allData.mag_z);
+    break;
+  case 3:
+    LoRa.print(allData.pot);
+    LoRa.print(" ");
+    LoRa.print(allData.joy_x);
+    LoRa.print(" ");
+    LoRa.print(allData.joy_y);
+    break;
+  case 4:
+    LoRa.print(allData.mode);
+    LoRa.print(" ");
+    LoRa.print(allData.channel);
+    LoRa.print(" ");
+    LoRa.print(allData.button);
+    break;
+  }
+  LoRa.endPacket(1);
+}       
+
+void sendBlt(uint8_t msg)
 {
+  switch (msg)
+  {
+  case 0:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.mode);
+    BLUETOOTH_SERIAL.println(allData.channel);
+    BLUETOOTH_SERIAL.println(allData.button);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 1:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.joy_x);
+    BLUETOOTH_SERIAL.println(allData.joy_y);
+    BLUETOOTH_SERIAL.println(allData.pot);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 2:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.gps_lon);
+    BLUETOOTH_SERIAL.println(allData.gps_lat);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 3:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.temp);
+    BLUETOOTH_SERIAL.println(allData.pressure);
+    BLUETOOTH_SERIAL.println(allData.humid);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 4:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.tVOC);
+    BLUETOOTH_SERIAL.println(allData.emg_active);
+    BLUETOOTH_SERIAL.println(allData.flex_sensor_1);
+    BLUETOOTH_SERIAL.println(allData.flex_sensor_2);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 5:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.mode);
+    BLUETOOTH_SERIAL.println(allData.channel);
+    BLUETOOTH_SERIAL.println(allData.button);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 6:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.acs_x);
+    BLUETOOTH_SERIAL.println(allData.acs_y);
+    BLUETOOTH_SERIAL.println(allData.acs_z);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
+  case 7:
+    BLUETOOTH_SERIAL.println(millis());
+    BLUETOOTH_SERIAL.println(allData.mag_x);
+    BLUETOOTH_SERIAL.println(allData.mag_y);
+    BLUETOOTH_SERIAL.println(allData.mag_z);
+    BLUETOOTH_SERIAL.println();
+    BLUETOOTH_SERIAL.println();
+    break;
   
-}             
+  }
+}
+
 uint8_t getMode()
 {
   bitWrite(allData.mode, 0, (!digitalRead(sw1_pins[0])));
@@ -764,23 +891,85 @@ uint16_t getTVOCdata()
 
 void dispStrip()
 {
-  
+  strip.fill(mCOLOR(YELLOW)); // заливаем жёлтым
+  strip.show();
 } 
 
 void readEmg()
 {
-  
+  // for future features
+  const int maxCalm = 100;
+  bool emgActive;
+  for(int i = 0; i<5; i++)
+  {
+    if(analogRead(EMG_AOUT)>maxCalm+1)
+    {
+      emgActive=1;
+      return;  
+    }
+  }
 } 
 
 void getTime()
 {
-  
+  // 2 ways, first is from the RTC module 
+  // but because of broken battary on rtc i will make it right later
+  Serial.println(watch.gettime("d-m-Y, H:i:s, D")); //(all data) 
+
 }  
 
 void getTemp()
 {
-  
+  if (millis() / 100 >= ds18b20_timer)    //  
+  {                                       //
+    if (millis() / 400 != 0)              //  
+    {                                     //                                                                                    
+      float temp;                         //                                                                                                                                                                        |
+      if (ds18b20_r_t(temp))           //                                                                                    
+        allData.temp = temp;             //                                                                                    
+      else                                //                                                                                    
+        allData.temp = NAN;              //          
+    }                                     //    
+    ds18b20_timer = millis() / 100 + 10;  //                                                                                    
+    ds18b20_convert_t();                  // 
+  }
 }   
+
+bool ds18b20_convert_t()
+{
+  if (!ds.reset()) // даем reset на шину
+  {
+    return false;
+  }
+  ds.write(OW_SKIP_ROM, 1);
+  ds.write(OW_DS18B20_CONVERT_T, 1);
+  return true;
+}
+bool ds18b20_r_t(float & t)
+{
+  if (!ds.reset()) // даем резет на шину
+  { 
+    return false;
+  }
+  ds.write(OW_SKIP_ROM, 1); // skip adressing
+  uint8_t scratchpad[DS18B20_SCRATCHPAD_SIZE];
+  ds.write(OW_DS18B20_READ_SCRATCHPAD, 1);
+  ds.read_bytes(scratchpad, sizeof(scratchpad));
+  uint8_t crc_actual = scratchpad[DS18B20_SCRATCHPAD_SIZE - 1]; // crc
+  uint8_t crc_calculated = OneWire::crc8(scratchpad, DS18B20_SCRATCHPAD_SIZE - 1); // calc crc
+  float temp;
+  if (crc_calculated != crc_actual)
+  {
+    return false;
+  }
+  uint16_t uraw_temp;
+  uraw_temp = scratchpad[0] | (static_cast<uint16_t>(scratchpad[1]) << 8);
+  int16_t raw_temp;
+  memcpy(&raw_temp, &uraw_temp, sizeof(raw_temp));
+  temp = raw_temp / 16.f;
+  t = temp;
+  return true;
+}
 
 void getGPSdata()
 {
@@ -821,6 +1010,16 @@ void getGPSdata()
 
 void getFlexSensorsData()
 {
+  uint16_t f1, f2;
+  for(int i = 0; i<4; i++)
+  {
+    f1+=analogRead(FLEX_1_PIN);
+    f2+=analogRead(FLEX_2_PIN); 
+  }
+  f1 >>= 2;
+  f2 >>= 2;
+  allData.flex_sensor_1=f1;
+  allData.flex_sensor_2=f2;
   
 }  
                            
