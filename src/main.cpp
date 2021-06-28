@@ -68,6 +68,8 @@ Now about functional:
 
 // LET THEREEE BEEE PINOUTTTT :)
 
+#include <Arduino.h>              // default lib
+
 // LCD (parallel interface goes to digital 2-9 pins)
 ///////////////////////
 #define LCD_CS    A3 // Chip Select goes to Analog 3
@@ -160,18 +162,18 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 //////////////////////////////////////////
 
 // Some colors
-////////////////////////////////
-#define BLACK      0x0000     //
-#define BLUE       0x001F     //
-#define RED        0xF800     //
-#define GREEN      0x07E0     //
-#define CYAN       0x07FF     //  
-#define MAGENTA    0xF81F     //
-#define YELLOW     0xFFE0     //
-#define DARKYELLOW 0x5AE3     //
-#define WHITE      0xFFFF     //
-#define BLUEWHITE  0xEFFF     //
-////////////////////////////////
+///////////////////////////////////
+//#define СBLACK      0x0000     //
+//#define СBLUE       0x001F     //
+//#define СRED        0xF800     //
+//#define СGREEN      0x07E0     //
+//#define СCYAN       0x07FF     //  
+//#define СMAGENTA    0xF81F     //
+//#define СYELLOW     0xFFE0     //
+//#define СDARKYELLOW 0x5AE3     //
+//#define СWHITE      0xFFFF     //
+//#define СBLUEWHITE  0xEFFF     //
+///////////////////////////////////
 
 // NRF_SETTINGS
 //////////////////////////////////////////
@@ -192,8 +194,6 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 #define LORA_SIG_BW 250E3       // 250E3 - max, look at your lib .h file for more
 #define LORA_SP_FACTOR 8        // 8 - best for RA-01 module (at least for mine)
 //////////////////////////////////
-
-#include <Arduino.h>              // default lib
 
 ////////////////////////////////////
 #include <SPI.h>                  // interfaces
@@ -222,7 +222,7 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 #include "printf.h"     //
 //////////////////////////
 
-#include <iarduino_GPS_NMEA.h>    // as you can see - gps lib
+#include <TinyGPS.h>              // as you can see - gps lib
 
 #include <iarduino_RTC.h>         // for the clock module
 
@@ -252,12 +252,14 @@ LEDdata leds[NUM_LEDS];                         //                              
 microLED strip(leds, NUM_LEDS, LED_PIN);        //                                                    //
 //////////////////////////////////////////////////                                                    //
                                                                                                       //
-RF24 radio(NRF_CS, NRF_CE);                                                                           //
+RF24 radio(NRF_CE, NRF_CS);                                                                           //
                                                                                                       //
 //////////////////////////////////                                                                    //
-iarduino_GPS_NMEA gps;          //                                                                    //  
-iarduino_RTC watch(RTC_DS1307); //                                                                    //
+TinyGPS gps;                    //                                                                    //  
+iarduino_RTC watch(2);          //                                                                    //
 //////////////////////////////////                                                                    //  
+                                                                                                      //
+SoftwareSerial mp3Serial(MP3_RX, MP3_TX);                                                             //
                                                                                                       //  
 //////////////////////////                                                                            //
 Adafruit_BME280 bme;    //                                                                            //
@@ -290,7 +292,7 @@ struct wholeData              //
   float temp;                 //
   float tVOC;                 //
   float humid;                //
-  long time;                  //
+  unsigned long time;         //
   int16_t acs_x;              //
   int16_t acs_y;              //
   int16_t acs_z;              //
@@ -305,7 +307,7 @@ struct wholeData              //
 struct telemetri              //
 {                             //
   uint8_t id=0;               //
-  long time;                  //
+  unsigned long time;         //
   uint8_t mode;               //
   uint8_t channel;            //  
   uint16_t joy_x;             //
@@ -360,6 +362,19 @@ void mode10();              //
 void mode11();              //
 //////////////////////////////
 
+uint16_t last_pot;
+uint16_t last_joyX;
+uint16_t last_joyY;
+uint16_t last_button;
+uint16_t last_channel;
+uint16_t last_mod;
+uint16_t last_acsx;
+uint16_t last_acsy;
+uint16_t last_acsz;
+uint16_t last_magx;
+uint16_t last_magy;
+uint16_t last_magz;
+uint32_t clean_timer;
 
 void setup() 
 {
@@ -378,9 +393,9 @@ void setup()
   pinMode(EMG_AOUT,  INPUT);               //
   pinMode(EMG_CS,    OUTPUT);              //
   pinMode(CO2_PWM,   INPUT);               //
-  pinMode(POT_PIN,   INPUT);               //
-  pinMode(JOY_X,     INPUT);               //
-  pinMode(JOY_Y,     INPUT);               //
+  pinMode(POT_PIN,   INPUT_PULLUP);        //
+  pinMode(JOY_X,     INPUT_PULLUP);        //
+  pinMode(JOY_Y,     INPUT_PULLUP);        //
   pinMode(buttons_pins[0], INPUT_PULLUP);  //
   pinMode(buttons_pins[1], INPUT_PULLUP);  //
   pinMode(buttons_pins[2], INPUT_PULLUP);  //
@@ -392,11 +407,473 @@ void setup()
   ///////////////////////////////////////////
 
   Serial.begin(COMMUNICATION_BAUDRATE);
-
   
+  //////////////////////////////////////////////////////// LoRa config
+  LoRa.setPins(LORA_NSS, LORA_RST, LORA_DIO0);          // 
+  if (!LoRa.begin(LORA_FR))                             // 
+  {                                                     //
+    Serial.println("Starting LoRa failed!");            //
+  }                                                     //
+  else                                                  //
+  {                                                     //
+    Serial.println("LoRa started sucsessfully");        //
+    LoRa.enableCrc();                                   //
+    LoRa.setCodingRate4(LORA_CODING_RATE);              //
+    LoRa.setSignalBandwidth(LORA_SIG_BW);               //
+    LoRa.setSpreadingFactor(LORA_SP_FACTOR);            //
+    LoRa.explicitHeaderMode();                          //
+  }                                                     //
+  ////////////////////////////////////////////////////////
+
+  ////////////////////////////////////// NRF config (you should check it in #define part)
+  printf_begin();                     //
+  radio.begin();                      //
+  radio.setChannel(NRF_CHANNEL);      //
+  radio.setDataRate(NRF_DATA_RATE);   //
+  radio.setPALevel(NRF_PA_LEVEL);     //
+  radio.openWritingPipe(NRF_PIPE);    //
+  radio.setAutoAck(NRF_AUTO_ASK);     //
+  radio.printDetails();               //
+  //////////////////////////////////////
+
+  ESP_SERIAL.begin(ESP_BAUDRATE);
+  BLUETOOTH_SERIAL.begin(BLUETOOTH_BAUDRATE);
+  GPS_SERIAL.begin(GPS_BAUDRATE);
+  mp3Serial.begin(9600);
+  myVR.begin(9600);
+
+  uint16_t ID = tft.readID(); 
+  Serial.print("ID = 0x");
+  Serial.println(ID, HEX);
+  if (ID == 0xD3D3) ID = 0x9481; // write-only shield
+  tft.begin(ID);
+  tft.setRotation(3); 
+  tft.fillScreen(TFT_YELLOW);
+
+  mp3_set_serial (mp3Serial);    
+  mp3_set_volume (15);
+
+  //if (!mpu.begin()) {
+  //  Serial.println("Failed to find MPU6050 chip");
+  //}
+
+  if(!apds.begin()){
+    Serial.println("failed to initialize APDS9960.");
+  }
+  apds.enableProximity(true);
+  apds.enableGesture(true);
+
+  mag.enableAutoRange(true);
+  if(!mag.begin()){
+    Serial.println("No LSM303 detected.");
+  }
+  if(!accel.begin()){
+    Serial.println("No LSM303 detected.");
+  }
+
+  strip.setBrightness(30);
+  strip.fill(YELLOW);
+  strip.show();
+
+  watch.begin();
+
+  unsigned status;
+    
+  // default settings
+  status = bme.begin();  
+  // status = bme.begin(0x76, &Wire2)
+  if (!status) {
+      Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+      Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+      Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+      Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+      Serial.print("        ID of 0x60 represents a BME 280.\n");
+      Serial.print("        ID of 0x61 represents a BME 680.\n");
+      while (1) delay(10);
+  }
+
+  sgp.begin();
+  SHT.Begin();
+
+
+
+
 }
 void loop() 
 {
-  
+  readAcs();
+  getMode();
+  getChannel();
+  getButtons();
+  getJoyData();
+  getPotData();
+  readMag();
+  dispInfo();
 
 }
+
+void sendNrf()
+{
+  radioData.time=allData.time;
+  radioData.mode=allData.mode;
+  radioData.channel=allData.channel;
+  radioData.joy_x=allData.joy_x;
+  radioData.joy_y=allData.joy_y;
+  radioData.pot=allData.pot;
+  radioData.flex_sensor_1=allData.flex_sensor_1;
+  radioData.flex_sensor_2=allData.flex_sensor_2;
+  radioData.acs_x=allData.acs_x;
+  radioData.acs_y=allData.acs_y;
+  radioData.acs_z=allData.acs_z;
+  radioData.mag_x=allData.mag_x;
+  radioData.mag_y=allData.mag_y;
+  radioData.mag_z=allData.mag_z;
+  radio.write(&radioData, sizeof(radioData));
+}            
+void sendLoRa()
+{
+  
+}            
+void sendBlt()
+{
+  
+}             
+uint8_t getMode()
+{
+  bitWrite(allData.mode, 0, (!digitalRead(sw1_pins[0])));
+  bitWrite(allData.mode, 1, (!digitalRead(sw1_pins[1])));
+  bitWrite(allData.mode, 2, (!digitalRead(sw1_pins[2])));
+  bitWrite(allData.mode, 3, (!digitalRead(sw1_pins[3])));
+  bitWrite(allData.mode, 4, (!digitalRead(sw1_pins[4])));
+  bitWrite(allData.mode, 5, (!digitalRead(sw1_pins[5])));
+  bitWrite(allData.mode, 6, (!digitalRead(sw1_pins[6])));
+  bitWrite(allData.mode, 7, (!digitalRead(sw1_pins[7])));
+  return allData.mode;                         // for debug
+}         
+
+uint8_t getChannel()
+{
+  bitWrite(allData.channel, 0, (!digitalRead(sw2_pins[0])));
+  bitWrite(allData.channel, 1, (!digitalRead(sw2_pins[1])));
+  bitWrite(allData.channel, 2, (!digitalRead(sw2_pins[2])));
+  bitWrite(allData.channel, 3, (!digitalRead(sw2_pins[3])));
+  bitWrite(allData.channel, 4, (!digitalRead(sw2_pins[4])));
+  bitWrite(allData.channel, 5, (!digitalRead(sw2_pins[5])));
+  bitWrite(allData.channel, 6, (!digitalRead(sw2_pins[6])));
+  bitWrite(allData.channel, 7, (!digitalRead(sw2_pins[7])));
+  return allData.channel;                         // for debug
+}       
+
+uint16_t getButtons()
+{
+  allData.button = 1000*!digitalRead(buttons_pins[0])+
+                   100* !digitalRead(buttons_pins[1])+
+                   10 * !digitalRead(buttons_pins[2])+
+                   1 * !digitalRead( buttons_pins[3]);
+  return allData.button;
+}      
+
+void getJoyData()
+{
+  //uint32_t x;
+  //uint32_t y;
+  //for(int i = 0; i<4; i++)
+  //{
+  //  x+=analogRead(JOY_X);
+  //  y+=analogRead(JOY_Y);
+  //}
+  //x/=4;                  
+  //y/=4;
+  
+  allData.joy_x = analogRead(JOY_X);
+  allData.joy_y = analogRead(JOY_Y);
+}        
+
+uint16_t getPotData()
+{
+  //uint32_t potVal;
+  //for(int i = 0; i<4; i++)
+  //  potVal += analogRead(POT_PIN);
+  //potVal /= 4;
+  allData.pot = analogRead(POT_PIN);
+  return allData.pot;
+}      
+
+uint8_t getGesture()
+{
+  uint8_t prox = apds.readProximity();
+  return prox;
+}       
+
+void readAcs()
+{
+  sensors_event_t event;
+  accel.getEvent(&event);
+  allData.acs_x = event.acceleration.x;
+  allData.acs_y = event.acceleration.y;
+  allData.acs_z = event.acceleration.z;
+}             
+
+void readMag()
+{
+  sensors_event_t event;
+  mag.getEvent(&event);
+  allData.mag_x = event.magnetic.x;
+  allData.mag_y = event.magnetic.y;
+  allData.mag_z = event.magnetic.z;
+  
+}
+
+void dispInfo()
+{
+  tft.setCursor(0,6);
+  tft.setTextColor(0x0000);
+  tft.setTextSize(2);
+  tft.print(" mode/channel: ");
+  tft.setCursor(200,6);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_mod);
+  tft.setCursor(200,6);
+  tft.setTextColor(0x0000);
+  tft.print(allData.mode);
+  tft.setTextColor(TFT_YELLOW);
+  tft.setCursor(260,6);
+  tft.print(last_channel);
+  tft.setTextColor(0x0000);
+  tft.setCursor(260,6);
+  tft.print(allData.channel);
+
+  tft.setCursor(0,35);
+  tft.print(" buttons: ");
+  tft.setTextColor(TFT_YELLOW);
+  tft.setCursor(120,35);
+  tft.print(last_button);
+  tft.setCursor(120,35);
+  tft.setTextColor(0x0000);
+  tft.println(allData.button);
+
+  tft.setCursor(0,64);
+  tft.print(" pot: ");
+  tft.setCursor(90,64);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_pot);
+  tft.setCursor(90,64);
+  tft.setTextColor(0x0000);
+  tft.println(allData.pot);
+
+  tft.setCursor(0,93);
+  tft.print(" mag: ");
+  tft.setTextColor(TFT_YELLOW);
+  tft.setCursor(90,93);
+  tft.print(last_magx);
+  tft.setTextColor(0x0000);
+  tft.setCursor(90,93);
+  tft.print(allData.mag_x);
+  tft.print(" ");
+  tft.setCursor(150,93);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_magy);
+  tft.setCursor(150,93);
+  tft.setTextColor(0x0000);
+  tft.print(allData.mag_y);
+  tft.print(" ");
+  tft.setCursor(210,93);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_magz);
+  tft.setTextColor(0x0000);
+  tft.setCursor(210,93);
+  tft.println(allData.mag_z);
+
+  tft.setCursor(0,122);
+  tft.print(" acs: ");
+  tft.setTextColor(TFT_YELLOW);
+  tft.setCursor(90,122);
+  tft.print(last_acsx);
+  tft.setCursor(90,122);
+  tft.setTextColor(0x0000);
+  tft.print(allData.acs_x);
+  tft.print(" ");
+  tft.setCursor(150,122);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_acsy);
+  tft.setCursor(150,122);
+  tft.setTextColor(0x0000);
+  tft.print(allData.acs_y);
+  tft.print(" ");
+  tft.setCursor(180,122);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_acsz);
+  tft.setCursor(180,122);
+  tft.setTextColor(0x0000);
+  tft.println(allData.acs_z);
+  tft.println("");
+
+  tft.setCursor(0,151);
+  tft.print(" JoyXY: ");
+  tft.setCursor(90,151);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_joyX);
+  tft.setCursor(90,151);
+  tft.setTextColor(0x0000);
+  tft.print(allData.joy_x);
+  tft.print(" ");
+  tft.setCursor(160,151);
+  tft.setTextColor(TFT_YELLOW);
+  tft.print(last_joyY);
+  tft.setCursor(160,151);
+  tft.setTextColor(0x0000);
+  tft.print(allData.joy_y);
+  last_pot=allData.pot;
+  last_joyX=allData.joy_x;
+  last_joyY=allData.joy_y;
+  last_button=allData.button;
+  last_channel=allData.channel;
+  last_mod=allData.mode;
+  last_acsx=allData.acs_x;
+  last_acsy=allData.acs_y;
+  last_acsz=allData.acs_z;
+  last_magx=allData.mag_x;
+  last_magy=allData.mag_y;
+  last_magz=allData.mag_z;
+  if(millis()>=clean_timer)
+  {
+    tft.fillScreen(TFT_YELLOW);
+    clean_timer+=3000;
+  }
+}      
+
+uint16_t getCo2Data()
+{
+  return 0;
+}     
+
+float getO2Data()
+{
+  return 0;
+}          
+
+float getHumid()
+{
+  return 0;
+}    
+
+uint16_t getTVOCdata()
+{
+  return 0;
+}     
+
+void dispStrip()
+{
+  
+} 
+
+void readEmg()
+{
+  
+} 
+
+void getTime()
+{
+  
+}  
+
+void getTemp()
+{
+  
+}   
+
+void getGPSdata()
+{
+  bool newData = false;
+  unsigned long chars;
+  unsigned short sentences, failed;
+
+  // For one second we parse GPS data and report some key values
+  for (unsigned long start = millis(); millis() - start < 1000;)
+  {
+    while (GPS_SERIAL.available())
+    {
+      char c = GPS_SERIAL.read();
+      // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
+      if (gps.encode(c)) // Did a new valid sentence come in?
+        newData = true;
+    }
+  }
+
+  if (newData)
+  {
+    float flat, flon;
+    unsigned long age;
+    gps.f_get_position(&flat, &flon, &age);
+    Serial.print("LAT=");
+    Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat, 6);
+    Serial.print(" LON=");
+    Serial.print(flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon, 6);
+    Serial.print(" SAT=");
+    Serial.print(gps.satellites() == TinyGPS::GPS_INVALID_SATELLITES ? 0 : gps.satellites());
+    Serial.print(" PREC=");
+    Serial.print(gps.hdop() == TinyGPS::GPS_INVALID_HDOP ? 0 : gps.hdop());
+    allData.gps_lon=flon;
+    allData.gps_lat=flat;
+    gps.get_datetime(&allData.time, &age);
+  }
+}  
+
+void getFlexSensorsData()
+{
+  
+}  
+                           
+void mode1()
+{
+  
+}   
+
+void mode2()
+{
+  
+}   
+
+void mode3()
+{
+  
+}    
+
+void mode4()
+{
+  
+} 
+
+void mode5()
+{
+  
+}    
+
+void mode6()
+{
+  
+} 
+
+void mode7()
+{
+  
+}               
+void mode8()
+{
+  
+} 
+
+void mode9()
+{
+  
+} 
+
+void mode10()
+{
+  
+}   
+
+void mode11()
+{
+  
+}              
