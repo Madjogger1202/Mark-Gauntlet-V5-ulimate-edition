@@ -344,7 +344,7 @@ struct telemetri              //
 //////////////////////////////
 void sendNrf();             //
 void sendLoRa(uint8_t msg); //
-void sendBlt(uint8_t msg);             //
+void sendBlt(uint8_t msg);  //
 uint8_t getMode();          //
 uint8_t getChannel();       //
 uint16_t getButtons();      //
@@ -469,7 +469,7 @@ void setup()
   if (ID == 0xD3D3) ID = 0x9481; // write-only shield
   tft.begin(ID);
   tft.setRotation(3); 
-  tft.fillScreen(TFT_YELLOW);
+  tft.fillScreen(0xFFE0);
 
   mp3_set_serial (mp3Serial);    
   mp3_set_volume (15);
@@ -522,14 +522,49 @@ void setup()
 }
 void loop() 
 {
-  readAcs();
+  
   getMode();
   getChannel();
   getButtons();
+  readAcs();
   getJoyData();
   getPotData();
   readMag();
   dispInfo();
+  switch (allData.mode)
+  {
+  case 0:
+    mode1();
+    break;
+  case 1:
+    mode1();
+    break;
+  case 2:
+    mode2();
+    break;
+  case 3:
+    mode3();
+    break;
+  case 4:
+    mode4();
+    break;
+  case 5:
+    mode1();
+    break;
+  case 6:
+    mode1();
+    break;
+  case 7:
+    mode2();
+    break;
+  case 8:
+    mode3();
+    break;
+  case 9:
+    mode4();
+    break;
+  
+  }
 
 }
 
@@ -758,12 +793,12 @@ void dispInfo()
   tft.setTextSize(2);
   tft.print(" mode/channel: ");
   tft.setCursor(200,6);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_mod);
   tft.setCursor(200,6);
   tft.setTextColor(0x0000);
   tft.print(allData.mode);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.setCursor(260,6);
   tft.print(last_channel);
   tft.setTextColor(0x0000);
@@ -772,7 +807,7 @@ void dispInfo()
 
   tft.setCursor(0,35);
   tft.print(" buttons: ");
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.setCursor(120,35);
   tft.print(last_button);
   tft.setCursor(120,35);
@@ -782,7 +817,7 @@ void dispInfo()
   tft.setCursor(0,64);
   tft.print(" pot: ");
   tft.setCursor(90,64);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_pot);
   tft.setCursor(90,64);
   tft.setTextColor(0x0000);
@@ -790,7 +825,7 @@ void dispInfo()
 
   tft.setCursor(0,93);
   tft.print(" mag: ");
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.setCursor(90,93);
   tft.print(last_magx);
   tft.setTextColor(0x0000);
@@ -798,14 +833,14 @@ void dispInfo()
   tft.print(allData.mag_x);
   tft.print(" ");
   tft.setCursor(150,93);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_magy);
   tft.setCursor(150,93);
   tft.setTextColor(0x0000);
   tft.print(allData.mag_y);
   tft.print(" ");
   tft.setCursor(210,93);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_magz);
   tft.setTextColor(0x0000);
   tft.setCursor(210,93);
@@ -813,7 +848,7 @@ void dispInfo()
 
   tft.setCursor(0,122);
   tft.print(" acs: ");
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.setCursor(90,122);
   tft.print(last_acsx);
   tft.setCursor(90,122);
@@ -821,14 +856,14 @@ void dispInfo()
   tft.print(allData.acs_x);
   tft.print(" ");
   tft.setCursor(150,122);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_acsy);
   tft.setCursor(150,122);
   tft.setTextColor(0x0000);
   tft.print(allData.acs_y);
   tft.print(" ");
   tft.setCursor(180,122);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_acsz);
   tft.setCursor(180,122);
   tft.setTextColor(0x0000);
@@ -838,14 +873,14 @@ void dispInfo()
   tft.setCursor(0,151);
   tft.print(" JoyXY: ");
   tft.setCursor(90,151);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_joyX);
   tft.setCursor(90,151);
   tft.setTextColor(0x0000);
   tft.print(allData.joy_x);
   tft.print(" ");
   tft.setCursor(160,151);
-  tft.setTextColor(TFT_YELLOW);
+  tft.setTextColor(0xFFE0);
   tft.print(last_joyY);
   tft.setCursor(160,151);
   tft.setTextColor(0x0000);
@@ -864,28 +899,51 @@ void dispInfo()
   last_magz=allData.mag_z;
   if(millis()>=clean_timer)
   {
-    tft.fillScreen(TFT_YELLOW);
+    tft.fillScreen(0xFFE0);
     clean_timer+=3000;
   }
 }      
 
 uint16_t getCo2Data()
 {
-  return 0;
+  uint32_t timer_high, timer_low;
+  // TODO write fast way of reading PWM sig 
+  timer_high = pulseIn(CO2_PWM, HIGH, 1000);
+  timer_high = 1004 - timer_low;
+  timer_low = 5000 * (timer_low - 2) / (timer_low + timer_high - 4);  // коэффициент 5000 стандартный, на некоторых модулях по дефолту идет 2000
+  if ((timer_low > 0) && (timer_low < 5000))
+    return timer_low;
+  else
+    return 0;
 }     
 
 float getO2Data()
 {
+  float o2;
+  unsigned long int sum = 0;
+  const float VRefer = 21.59;       // voltage of adc reference (not real voltage)
+  float Vout =0;
+  for (unsigned char i = 64;i > 0;i--)
+  {
+    sum = sum + analogRead(O2_SENSOR);
+    delayMicroseconds(250);
+  }
+  o2 = sum >> 6;
+  o2 /= 9.27;
   return 0;
 }          
 
 float getHumid()
 {
+  SHT.UpdateData();
+  allData.humid = SHT.GetRelHumidity();
   return 0;
 }    
 
 uint16_t getTVOCdata()
 {
+  sgp.IAQmeasure();
+  allData.tVOC=sgp.TVOC;
   return 0;
 }     
 
@@ -925,10 +983,10 @@ void getTemp()
     if (millis() / 400 != 0)              //  
     {                                     //                                                                                    
       float temp;                         //                                                                                                                                                                        |
-      if (ds18b20_r_t(temp))           //                                                                                    
-        allData.temp = temp;             //                                                                                    
+      if (ds18b20_r_t(temp))              //                                                                                    
+        allData.temp = temp;              //                                                                                    
       else                                //                                                                                    
-        allData.temp = NAN;              //          
+        allData.temp = NAN;               //          
     }                                     //    
     ds18b20_timer = millis() / 100 + 10;  //                                                                                    
     ds18b20_convert_t();                  // 
@@ -937,7 +995,7 @@ void getTemp()
 
 bool ds18b20_convert_t()
 {
-  if (!ds.reset()) // даем reset на шину
+  if (!ds.reset()) // 
   {
     return false;
   }
@@ -945,9 +1003,10 @@ bool ds18b20_convert_t()
   ds.write(OW_DS18B20_CONVERT_T, 1);
   return true;
 }
+
 bool ds18b20_r_t(float & t)
 {
-  if (!ds.reset()) // даем резет на шину
+  if (!ds.reset()) // 
   { 
     return false;
   }
