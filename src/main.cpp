@@ -219,6 +219,8 @@ const int sw2_pins[8]={40, 41, 42, 43, 44, 45, 46, 47}; //
 ////////////////////////////////////
 #include "Adafruit_GFX.h"         // for tft lcd
 #include <MCUFRIEND_kbv.h>        //
+#include <Fonts/FreeSans12pt7b.h> //
+#include <FreeDefaultFonts.h>     //
 ////////////////////////////////////
 
 ////////////////////////////////////
@@ -405,8 +407,8 @@ void setup()
   pinMode(LORA_NSS,  OUTPUT);              //
   pinMode(LORA_RST,  OUTPUT);              //
   pinMode(LORA_DIO0, INPUT);               //
-  pinMode(MP3_TX,    INPUT);               //
-  pinMode(MP3_RX,    OUTPUT);              //
+  //pinMode(MP3_TX,    INPUT);               //
+  //pinMode(MP3_RX,    OUTPUT);              //
   pinMode(VR_TX,     INPUT);               //
   pinMode(VR_RX,     OUTPUT);              //
   pinMode(LED_PIN,   OUTPUT);              //
@@ -472,7 +474,7 @@ void setup()
   tft.fillScreen(0xFFE0);
 
   mp3_set_serial (mp3Serial);    
-  mp3_set_volume (15);
+  mp3_set_volume (30);
 
   //if (!mpu.begin()) {
   //  Serial.println("Failed to find MPU6050 chip");
@@ -531,37 +533,40 @@ void loop()
   getPotData();
   readMag();
   dispInfo();
+  getHumid();
+  getTemp();
+  getFlexSensorsData();
   switch (allData.mode)
   {
   case 0:
     mode1();
     break;
   case 1:
-    mode1();
+    mode2();
     break;
   case 2:
-    mode2();
+    mode3();
     break;
   case 3:
-    mode3();
+    mode4();
     break;
   case 4:
-    mode4();
+    mode5();
     break;
   case 5:
-    mode1();
+    mode6();
     break;
   case 6:
-    mode1();
+    mode7();
     break;
   case 7:
-    mode2();
+    mode8();
     break;
   case 8:
-    mode3();
+    mode9();
     break;
   case 9:
-    mode4();
+    mode10();
     break;
   
   }
@@ -698,6 +703,7 @@ void sendBlt(uint8_t msg)
     break;
   
   }
+  return;
 }
 
 uint8_t getMode()
@@ -788,102 +794,109 @@ void readMag()
 
 void dispInfo()
 {
-  tft.setCursor(0,6);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(0,18);
   tft.setTextColor(0x0000);
-  tft.setTextSize(2);
+  tft.setTextSize(1);
   tft.print(" mode/channel: ");
-  tft.setCursor(200,6);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_mod);
-  tft.setCursor(200,6);
-  tft.setTextColor(0x0000);
+  tft.fillRect(200,2, 300, 19, 0xFFE0);
+  //tft.setCursor(200,6);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_mod);
+  tft.setCursor(200,18);
+  //tft.setTextColor(0x0000);
   tft.print(allData.mode);
-  tft.setTextColor(0xFFE0);
-  tft.setCursor(260,6);
-  tft.print(last_channel);
-  tft.setTextColor(0x0000);
-  tft.setCursor(260,6);
+  //tft.setTextColor(0xFFE0);
+  //tft.setCursor(260,6);
+  //tft.print(last_channel);
+  //tft.setTextColor(0x0000);
+  tft.setCursor(260,18);
   tft.print(allData.channel);
 
-  tft.setCursor(0,35);
+  tft.setCursor(0,45);
   tft.print(" buttons: ");
-  tft.setTextColor(0xFFE0);
-  tft.setCursor(120,35);
-  tft.print(last_button);
-  tft.setCursor(120,35);
-  tft.setTextColor(0x0000);
+  tft.fillRect(120, 29, 300, 19, 0xFFE0);
+  //tft.setTextColor(0xFFE0);
+  //tft.setCursor(120,45);
+  //tft.print(last_button);
+  tft.setCursor(120,45);
+  //tft.setTextColor(0x0000);
   tft.println(allData.button);
 
-  tft.setCursor(0,64);
+  tft.setCursor(0,86);
   tft.print(" pot: ");
-  tft.setCursor(90,64);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_pot);
-  tft.setCursor(90,64);
+  tft.fillRect(90,70, 300, 19, 0xFFE0);
+  //tft.setCursor(90,86);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_pot);
+  tft.setCursor(90,86);
   tft.setTextColor(0x0000);
   tft.println(allData.pot);
 
-  tft.setCursor(0,93);
+  tft.setCursor(0,105);
   tft.print(" mag: ");
-  tft.setTextColor(0xFFE0);
-  tft.setCursor(90,93);
-  tft.print(last_magx);
-  tft.setTextColor(0x0000);
-  tft.setCursor(90,93);
+  tft.fillRect(90, 89, 300, 17, 0xFFE0);
+  //tft.setTextColor(0xFFE0);
+  //tft.setCursor(90,105);
+  //tft.print(last_magx);
+  //tft.setTextColor(0x0000);
+  tft.setCursor(90,105);
   tft.print(allData.mag_x);
   tft.print(" ");
-  tft.setCursor(150,93);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_magy);
-  tft.setCursor(150,93);
-  tft.setTextColor(0x0000);
+  //tft.setCursor(150,105);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_magy);
+  tft.setCursor(150,105);
+  //tft.setTextColor(0x0000);
   tft.print(allData.mag_y);
   tft.print(" ");
-  tft.setCursor(210,93);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_magz);
-  tft.setTextColor(0x0000);
-  tft.setCursor(210,93);
+  //tft.setCursor(210,105);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_magz);
+  //tft.setTextColor(0x0000);
+  tft.setCursor(210,105);
   tft.println(allData.mag_z);
 
-  tft.setCursor(0,122);
+  tft.setCursor(0,134);
   tft.print(" acs: ");
-  tft.setTextColor(0xFFE0);
-  tft.setCursor(90,122);
-  tft.print(last_acsx);
-  tft.setCursor(90,122);
-  tft.setTextColor(0x0000);
+  tft.fillRect(90, 118, 300, 19, 0xFFE0);
+  //tft.setTextColor(0xFFE0);
+  //tft.setCursor(90,134);
+  //tft.print(last_acsx);
+  tft.setCursor(90,134);
+  //tft.setTextColor(0x0000);
   tft.print(allData.acs_x);
   tft.print(" ");
-  tft.setCursor(150,122);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_acsy);
-  tft.setCursor(150,122);
-  tft.setTextColor(0x0000);
+  //tft.setCursor(150,134);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_acsy);
+  tft.setCursor(150,134);
+  //tft.setTextColor(0x0000);
   tft.print(allData.acs_y);
   tft.print(" ");
-  tft.setCursor(180,122);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_acsz);
-  tft.setCursor(180,122);
-  tft.setTextColor(0x0000);
+  //tft.setCursor(180,134);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_acsz);
+  tft.setCursor(180,134);
+  //tft.setTextColor(0x0000);
   tft.println(allData.acs_z);
   tft.println("");
 
-  tft.setCursor(0,151);
+  tft.setCursor(0,163);
   tft.print(" JoyXY: ");
-  tft.setCursor(90,151);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_joyX);
-  tft.setCursor(90,151);
-  tft.setTextColor(0x0000);
+  tft.fillRect(90,147, 300, 19, 0xFFE0);
+  //tft.setCursor(90,163);
+  //tft.setTextColor(0xFFE0);
+  //tft.print(last_joyX);
+  tft.setCursor(90,163);
+  //tft.setTextColor(0x0000);
   tft.print(allData.joy_x);
   tft.print(" ");
-  tft.setCursor(160,151);
-  tft.setTextColor(0xFFE0);
-  tft.print(last_joyY);
-  tft.setCursor(160,151);
-  tft.setTextColor(0x0000);
+  //tft.setCursor(160,163);
+  //tft.setTextColor(0xFFE0);
+  ///tft.print(last_joyY);
+  tft.setCursor(160,163);
+  //tft.setTextColor(0x0000);
   tft.print(allData.joy_y);
   last_pot=allData.pot;
   last_joyX=allData.joy_x;
@@ -897,11 +910,11 @@ void dispInfo()
   last_magx=allData.mag_x;
   last_magy=allData.mag_y;
   last_magz=allData.mag_z;
-  if(millis()>=clean_timer)
-  {
-    tft.fillScreen(0xFFE0);
-    clean_timer+=3000;
-  }
+  //if(millis()>=clean_timer)  // cleans all disp
+  //{
+  //  tft.fillScreen(0xFFE0);
+  //  clean_timer+=3000;
+  //}
 }      
 
 uint16_t getCo2Data()
@@ -1070,13 +1083,13 @@ void getGPSdata()
 void getFlexSensorsData()
 {
   uint16_t f1, f2;
-  for(int i = 0; i<4; i++)
-  {
+//  for(int i = 0; i<4; i++)
+//  {
     f1+=analogRead(FLEX_1_PIN);
     f2+=analogRead(FLEX_2_PIN); 
-  }
-  f1 >>= 2;
-  f2 >>= 2;
+//  }
+//  f1 >>= 2;
+//  f2 >>= 2;
   allData.flex_sensor_1=f1;
   allData.flex_sensor_2=f2;
   
@@ -1084,22 +1097,23 @@ void getFlexSensorsData()
                            
 void mode1()
 {
-  
+  sendNrf();
 }   
 
 void mode2()
 {
-  
+  sendLoRa(allData.channel);
 }   
 
 void mode3()
 {
-  
+  sendBlt(allData.channel);
 }    
 
 void mode4()
 {
-  
+  mp3_play (99);
+  delay(1000);
 } 
 
 void mode5()
